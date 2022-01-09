@@ -1,6 +1,5 @@
-/**
- * Copyright (C) 2009-2013 Typesafe Inc. <http://www.typesafe.com>
- */
+/** Copyright (C) 2009-2013 Typesafe Inc. <http://www.typesafe.com>
+  */
 package actorbintree
 
 import akka.actor._
@@ -39,41 +38,50 @@ object BinaryTreeSet {
   /** Request to perform garbage collection */
   case object GC
 
-  /** Holds the answer to the Contains request with identifier `id`.
-    * `result` is true if and only if the element is present in the tree.
+  /** Holds the answer to the Contains request with identifier `id`. `result` is
+    * true if and only if the element is present in the tree.
     */
   case class ContainsResult(id: Int, result: Boolean) extends OperationReply
 
-  /** Message to signal successful completion of an insert or remove operation. */
+  /** Message to signal successful completion of an insert or remove operation.
+    */
   case class OperationFinished(id: Int) extends OperationReply
 
 }
-
 
 class BinaryTreeSet extends Actor {
   import BinaryTreeSet._
   import BinaryTreeNode._
 
-  def createRoot: ActorRef = context.actorOf(BinaryTreeNode.props(0, initiallyRemoved = true))
+  def createRoot: ActorRef =
+    context.actorOf(BinaryTreeNode.props(0, initiallyRemoved = true))
 
-  var root = createRoot
+  var root: ActorRef = createRoot
 
   // optional (used to stash incoming operations during garbage collection)
-  var pendingQueue = Queue.empty[Operation]
+  var pendingQueue: Queue[Operation] = Queue.empty[Operation]
 
   // optional
-  def receive = normal
+  def receive: Receive = normal
 
   // optional
   /** Accepts `Operation` and `GC` messages. */
-  val normal: Receive = { case _ => ??? }
+  val normal: Receive = {
+    case Insert(requester, id, elem)   => ???
+    case Contains(requester, id, elem) => ???
+    case Remove(requester, id, elem)   => ???
+    case GC                            => ???
+  }
 
   // optional
-  /** Handles messages while garbage collection is performed.
-    * `newRoot` is the root of the new binary tree where we want to copy
-    * all non-removed elements into.
+  /** Handles messages while garbage collection is performed. `newRoot` is the
+    * root of the new binary tree where we want to copy all non-removed elements
+    * into.
     */
-  def garbageCollecting(newRoot: ActorRef): Receive = ???
+  def garbageCollecting(newRoot: ActorRef): Receive = {
+    case o: Operation => ???
+    case GC           => ???
+  }
 
 }
 
@@ -84,35 +92,41 @@ object BinaryTreeNode {
   case object Right extends Position
 
   case class CopyTo(treeNode: ActorRef)
-  /**
-   * Acknowledges that a copy has been completed. This message should be sent
-   * from a node to its parent, when this node and all its children nodes have
-   * finished being copied.
-   */
+
+  /** Acknowledges that a copy has been completed. This message should be sent
+    * from a node to its parent, when this node and all its children nodes have
+    * finished being copied.
+    */
   case object CopyFinished
 
-  def props(elem: Int, initiallyRemoved: Boolean) = Props(classOf[BinaryTreeNode],  elem, initiallyRemoved)
+  def props(elem: Int, initiallyRemoved: Boolean): Props =
+    Props(classOf[BinaryTreeNode], elem, initiallyRemoved)
 }
 
 class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean) extends Actor {
   import BinaryTreeNode._
   import BinaryTreeSet._
 
-  var subtrees = Map[Position, ActorRef]()
-  var removed = initiallyRemoved
+  var subtrees: Map[Position, ActorRef] = Map[Position, ActorRef]()
+  var removed: Boolean = initiallyRemoved
 
   // optional
-  def receive = normal
+  def receive: Receive = normal
 
   // optional
   /** Handles `Operation` messages and `CopyTo` requests. */
-  val normal: Receive = { case _ => ??? }
+  val normal: Receive = {
+    case Insert(requester, id, elem)   => ???
+    case Contains(requester, id, elem) => ???
+    case Remove(requester, id, elem)   => ???
+    case CopyTo(treeNode)              => ???
+  }
 
   // optional
   /** `expected` is the set of ActorRefs whose replies we are waiting for,
-    * `insertConfirmed` tracks whether the copy of this node to the new tree has been confirmed.
+    * `insertConfirmed` tracks whether the copy of this node to the new tree has
+    * been confirmed.
     */
   def copying(expected: Set[ActorRef], insertConfirmed: Boolean): Receive = ???
-
 
 }
