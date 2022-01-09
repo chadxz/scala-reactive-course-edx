@@ -1,6 +1,5 @@
-/**
- * Copyright (C) 2009-2015 Typesafe Inc. <http://www.typesafe.com>
- */
+/** Copyright (C) 2009-2015 Typesafe Inc. <http://www.typesafe.com>
+  */
 package actorbintree
 
 import akka.actor.{ActorRef, ActorSystem, Props}
@@ -11,26 +10,47 @@ import org.junit.Assert._
 import scala.util.Random
 import scala.concurrent.duration._
 
-class BinaryTreeSuite extends TestKit(ActorSystem("BinaryTreeSuite")) with ImplicitSender {
+class BinaryTreeSuite
+    extends TestKit(ActorSystem("BinaryTreeSuite"))
+    with ImplicitSender {
 
   import actorbintree.BinaryTreeSet._
 
-  def receiveN(requester: TestProbe, ops: Seq[Operation], expectedReplies: Seq[OperationReply]): Unit =
+  def receiveN(
+      requester: TestProbe,
+      ops: Seq[Operation],
+      expectedReplies: Seq[OperationReply]
+  ): Unit =
     requester.within(5.seconds) {
       val repliesUnsorted = for (i <- 1 to ops.size) yield try {
         requester.expectMsgType[OperationReply]
       } catch {
-        case ex: Throwable if ops.size > 10 => sys.error(s"failure to receive confirmation $i/${ops.size}\n$ex")
-        case ex: Throwable                  => sys.error(s"failure to receive confirmation $i/${ops.size}\nRequests:" + ops.mkString("\n    ", "\n     ", "") + s"\n$ex")
+        case ex: Throwable if ops.size > 10 =>
+          sys.error(s"failure to receive confirmation $i/${ops.size}\n$ex")
+        case ex: Throwable =>
+          sys.error(
+            s"failure to receive confirmation $i/${ops.size}\nRequests:" + ops
+              .mkString("\n    ", "\n     ", "") + s"\n$ex"
+          )
       }
       val replies = repliesUnsorted.sortBy(_.id)
       if (replies != expectedReplies) {
-        val pairs = (replies zip expectedReplies).zipWithIndex filter (x => x._1._1 != x._1._2)
-        fail("unexpected replies:" + pairs.map(x => s"at index ${x._2}: got ${x._1._1}, expected ${x._1._2}").mkString("\n    ", "\n    ", ""))
+        val pairs = (replies zip expectedReplies).zipWithIndex filter (x =>
+          x._1._1 != x._1._2
+        )
+        fail(
+          "unexpected replies:" + pairs
+            .map(x => s"at index ${x._2}: got ${x._1._1}, expected ${x._1._2}")
+            .mkString("\n    ", "\n    ", "")
+        )
       }
     }
 
-  def verify(probe: TestProbe, ops: Seq[Operation], expected: Seq[OperationReply]): Unit = {
+  def verify(
+      probe: TestProbe,
+      ops: Seq[Operation],
+      expected: Seq[OperationReply]
+  ): Unit = {
     val topNode = system.actorOf(Props[BinaryTreeSet])
 
     ops foreach { op =>
@@ -45,13 +65,13 @@ class BinaryTreeSuite extends TestKit(ActorSystem("BinaryTreeSuite")) with Impli
     val topNode = system.actorOf(Props[BinaryTreeSet])
 
     topNode ! Contains(testActor, id = 1, 1)
-    expectMsg(ContainsResult(1, false))
+    expectMsg(ContainsResult(1, result = false))
 
     topNode ! Insert(testActor, id = 2, 1)
     topNode ! Contains(testActor, id = 3, 1)
 
     expectMsg(OperationFinished(2))
-    expectMsg(ContainsResult(3, true))
+    expectMsg(ContainsResult(3, result = true))
     ()
   }
 
@@ -59,37 +79,38 @@ class BinaryTreeSuite extends TestKit(ActorSystem("BinaryTreeSuite")) with Impli
     val requester = TestProbe()
     val requesterRef = requester.ref
     val ops = List(
-      Insert(requesterRef, id=100, 1),
-      Contains(requesterRef, id=50, 2),
-      Remove(requesterRef, id=10, 1),
-      Insert(requesterRef, id=20, 2),
-      Contains(requesterRef, id=80, 1),
-      Contains(requesterRef, id=70, 2)
+      Insert(requesterRef, id = 100, 1),
+      Contains(requesterRef, id = 50, 2),
+      Remove(requesterRef, id = 10, 1),
+      Insert(requesterRef, id = 20, 2),
+      Contains(requesterRef, id = 80, 1),
+      Contains(requesterRef, id = 70, 2)
     )
 
     val expectedReplies = List(
-      OperationFinished(id=10),
-      OperationFinished(id=20),
-      ContainsResult(id=50, false),
-      ContainsResult(id=70, true),
-      ContainsResult(id=80, false),
-      OperationFinished(id=100)
+      OperationFinished(id = 10),
+      OperationFinished(id = 20),
+      ContainsResult(id = 50, result = false),
+      ContainsResult(id = 70, result = true),
+      ContainsResult(id = 80, result = false),
+      OperationFinished(id = 100)
     )
 
     verify(requester, ops, expectedReplies)
   }
 
-
-  @Test def `behave identically to built-in set (includes GC) (40pts)`(): Unit = {
+  @Test def `behave identically to built-in set (includes GC) (40pts)`()
+      : Unit = {
     val rnd = new Random()
     def randomOperations(requester: ActorRef, count: Int): Seq[Operation] = {
       def randomElement: Int = rnd.nextInt(100)
-      def randomOperation(requester: ActorRef, id: Int): Operation = rnd.nextInt(4) match {
-        case 0 => Insert(requester, id, randomElement)
-        case 1 => Insert(requester, id, randomElement)
-        case 2 => Contains(requester, id, randomElement)
-        case 3 => Remove(requester, id, randomElement)
-      }
+      def randomOperation(requester: ActorRef, id: Int): Operation =
+        rnd.nextInt(4) match {
+          case 0 => Insert(requester, id, randomElement)
+          case 1 => Insert(requester, id, randomElement)
+          case 2 => Contains(requester, id, randomElement)
+          case 3 => Remove(requester, id, randomElement)
+        }
 
       for (seq <- 0 until count) yield randomOperation(requester, seq)
     }

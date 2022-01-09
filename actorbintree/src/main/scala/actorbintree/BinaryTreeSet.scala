@@ -54,7 +54,7 @@ class BinaryTreeSet extends Actor {
   import BinaryTreeNode._
 
   def createRoot: ActorRef =
-    context.actorOf(BinaryTreeNode.props(0, initiallyRemoved = true))
+    context.actorOf(BinaryTreeNode.props(0))
 
   var root: ActorRef = createRoot
 
@@ -67,10 +67,8 @@ class BinaryTreeSet extends Actor {
   // optional
   /** Accepts `Operation` and `GC` messages. */
   val normal: Receive = {
-    case Insert(requester, id, elem)   => ???
-    case Contains(requester, id, elem) => ???
-    case Remove(requester, id, elem)   => ???
-    case GC                            => ???
+    case o: Operation => root ! o
+    case GC           => ???
   }
 
   // optional
@@ -99,11 +97,12 @@ object BinaryTreeNode {
     */
   case object CopyFinished
 
-  def props(elem: Int, initiallyRemoved: Boolean): Props =
+  def props(elem: Int, initiallyRemoved: Boolean = false): Props =
     Props(classOf[BinaryTreeNode], elem, initiallyRemoved)
 }
 
-class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean) extends Actor {
+class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean = false)
+    extends Actor {
   import BinaryTreeNode._
   import BinaryTreeSet._
 
@@ -116,10 +115,39 @@ class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean) extends Actor {
   // optional
   /** Handles `Operation` messages and `CopyTo` requests. */
   val normal: Receive = {
-    case Insert(requester, id, elem)   => ???
-    case Contains(requester, id, elem) => ???
-    case Remove(requester, id, elem)   => ???
-    case CopyTo(treeNode)              => ???
+    case Insert(requester, id, receivedElem) =>
+      if (receivedElem != elem) {
+        val Side = if (receivedElem < elem) Left else Right
+        subtrees.get(Side) match {
+          case Some(actor) =>
+            actor ! Insert(requester, id, receivedElem)
+          case None =>
+            subtrees = subtrees + (Side -> context.actorOf(
+              BinaryTreeNode.props(receivedElem)
+            ))
+            requester ! OperationFinished(id)
+        }
+      } else requester ! OperationFinished(id)
+    case Contains(requester, id, receivedElem) =>
+      if (receivedElem != elem) {
+        val Side = if (receivedElem < elem) Left else Right
+        subtrees.get(Side) match {
+          case Some(actor) => actor ! Contains(requester, id, receivedElem)
+          case None        => requester ! ContainsResult(id, result = false)
+        }
+      } else requester ! ContainsResult(id, result = !removed)
+    case Remove(requester, id, receivedElem) =>
+      if (receivedElem != elem) {
+        val Side = if (receivedElem < elem) Left else Right
+        subtrees.get(Side) match {
+          case Some(actor) => actor ! Remove(requester, id, receivedElem)
+          case None        => requester ! OperationFinished(id)
+        }
+      } else {
+        removed = true
+        requester ! OperationFinished(id)
+      }
+    case CopyTo(treeNode) => ???
   }
 
   // optional
