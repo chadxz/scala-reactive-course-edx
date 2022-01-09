@@ -68,7 +68,10 @@ class BinaryTreeSet extends Actor {
   /** Accepts `Operation` and `GC` messages. */
   val normal: Receive = {
     case o: Operation => root ! o
-    case GC           => ???
+    case GC =>
+      val newRoot = createRoot
+      root ! CopyTo(newRoot)
+      context.become(garbageCollecting(newRoot))
   }
 
   // optional
@@ -77,10 +80,20 @@ class BinaryTreeSet extends Actor {
     * into.
     */
   def garbageCollecting(newRoot: ActorRef): Receive = {
-    case o: Operation => ???
-    case GC           => ???
-  }
+    case o: Operation => pendingQueue = pendingQueue.enqueue(o)
+    case CopyFinished =>
+      val oldRoot = root
+      root = newRoot
+      context.stop(oldRoot)
 
+      while (pendingQueue.nonEmpty) {
+        val (o, rest) = pendingQueue.dequeue
+        root ! o
+        pendingQueue = rest
+      }
+
+      context.become(normal)
+  }
 }
 
 object BinaryTreeNode {
@@ -127,7 +140,10 @@ class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean = false)
             ))
             requester ! OperationFinished(id)
         }
-      } else requester ! OperationFinished(id)
+      } else {
+        removed = false
+        requester ! OperationFinished(id)
+      }
     case Contains(requester, id, receivedElem) =>
       if (receivedElem != elem) {
         val Side = if (receivedElem < elem) Left else Right
@@ -147,7 +163,14 @@ class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean = false)
         removed = true
         requester ! OperationFinished(id)
       }
-    case CopyTo(treeNode) => ???
+    case CopyTo(treeNode) => {
+      if (!removed) {
+        treeNode ! Insert(self, 999, elem)
+      }
+
+      for { actor <- subtrees.values } actor ! CopyTo(treeNode)
+      context.become(copying(subtrees.values.toSet, insertConfirmed = false))
+    }
   }
 
   // optional
@@ -155,6 +178,10 @@ class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean = false)
     * `insertConfirmed` tracks whether the copy of this node to the new tree has
     * been confirmed.
     */
-  def copying(expected: Set[ActorRef], insertConfirmed: Boolean): Receive = ???
+  def copying(expected: Set[ActorRef], insertConfirmed: Boolean): Receive = {
+    case OperationFinished(_) =>
+      context.become(copying(expected, insertConfirmed = true))
+    case CopyFinished => ???
+  }
 
 }
