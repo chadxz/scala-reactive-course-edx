@@ -2,6 +2,7 @@
   */
 package actorbintree
 
+import actorbintree.BinaryTreeSet.Remove
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import org.junit.Test
@@ -99,6 +100,29 @@ class BinaryTreeSuite
     verify(requester, ops, expectedReplies)
   }
 
+  @Test def `handle GC`(): Unit = {
+    val requester = TestProbe()
+    val requesterRef = requester.ref
+
+    val topNode = system.actorOf(Props[BinaryTreeSet])
+
+    topNode ! Insert(requesterRef, id = 10, 1)
+    requester.expectMsg(OperationFinished(id = 10))
+
+    topNode ! Insert(requesterRef, id = 20, 2)
+    requester.expectMsg(OperationFinished(id = 20))
+
+    topNode ! Insert(requesterRef, id = 30, -1)
+    requester.expectMsg(OperationFinished(id = 30))
+
+    topNode ! Remove(requesterRef, id = 40, 1)
+    requester.expectMsg(OperationFinished(id = 40))
+
+    topNode ! GC
+    topNode ! Insert(requesterRef, id = 50, -10)
+    requester.expectMsg(OperationFinished(id = 50))
+  }
+
   @Test def `behave identically to built-in set (includes GC) (40pts)`()
       : Unit = {
     val rnd = new Random()
@@ -133,7 +157,7 @@ class BinaryTreeSuite
 
     val requester = TestProbe()
     val topNode = system.actorOf(Props[BinaryTreeSet])
-    val count = 1000
+    val count = 200
 
     val ops = randomOperations(requester.ref, count)
     val expectedReplies = referenceReplies(ops)
